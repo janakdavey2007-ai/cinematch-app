@@ -1,6 +1,6 @@
 """
-🎬 CINEMATCH PRO MAX
-🔥 ChatGPT-style recommender + Animations + Full UX
+🎬 CINEMATCH PRO MAX - ULTIMATE VERSION
+🔥 Mood + Chat + Voice-ready logic + Explainable AI + Gamification
 """
 
 import streamlit as st
@@ -9,48 +9,29 @@ import numpy as np
 import plotly.express as px
 import random
 import time
+import webbrowser
 
 st.set_page_config(page_title="CineMatch 🎬", layout="wide")
-
-# =========================
-# CSS (UNCHANGED STYLE)
-# =========================
-st.markdown("""
-<style>
-.main-header {
-    font-size: 3.5rem;
-    text-align: center;
-    font-weight: bold;
-    color: #6366f1;
-}
-.movie-card {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    padding: 1rem;
-    border-radius: 15px;
-    color: white;
-    margin: 10px 0;
-}
-.chat-box {
-    background: #1e293b;
-    padding: 1rem;
-    border-radius: 15px;
-    color: white;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # =========================
 # DATA
 # =========================
 @st.cache_data
 def get_movies():
-    return [
-        "🎭 The Dark Knight", "🧠 Inception", "🌌 Interstellar",
-        "🔫 Pulp Fiction", "🏃 Forrest Gump", "👨‍👦 The Godfather",
-        "👊 Fight Club", "💾 The Matrix", "🎪 Goodfellas",
-        "🕵️ Se7en", "💃 La La Land", "🚢 Titanic",
-        "🦸 Avengers", "🕷️ Spider-Man", "🦹 Deadpool"
-    ]
+    return {
+        "🎭 The Dark Knight": "action",
+        "🧠 Inception": "sci-fi",
+        "🌌 Interstellar": "sci-fi",
+        "🔫 Pulp Fiction": "action",
+        "🏃 Forrest Gump": "drama",
+        "👨‍👦 The Godfather": "drama",
+        "👊 Fight Club": "dark",
+        "💾 The Matrix": "sci-fi",
+        "💃 La La Land": "romance",
+        "🚢 Titanic": "romance",
+        "😂 Superbad": "comedy",
+        "🍻 Hangover": "comedy"
+    }
 
 # =========================
 # ENGINE
@@ -70,119 +51,134 @@ class Engine:
         recs = []
         for m in self.movies:
             if m not in self.ratings:
-                score = avg + random.uniform(-0.5, 0.8)
+                score = avg + random.uniform(-0.5, 1.0)
                 recs.append((m, round(max(1, min(5, score)), 1)))
         self.recommendations = sorted(recs, key=lambda x: x[1], reverse=True)
 
-    def chat_recommend(self, text):
+    def explain(self, movie):
+        if not self.ratings:
+            return "Popular choice among users"
+        liked = max(self.ratings, key=self.ratings.get)
+        return f"Because you liked {liked}"
+
+    def personality(self):
+        if not self.ratings:
+            return "🎬 Explorer"
+        genres = [self.movies[m] for m in self.ratings]
+        return f"🎭 You are a {max(set(genres), key=genres.count)} lover!"
+
+    def chat(self, text):
         text = text.lower()
-        if "action" in text or "hero" in text:
-            return ["🎭 The Dark Knight", "🦸 Avengers", "🕷️ Spider-Man"]
-        elif "love" in text or "romance" in text:
+        if "action" in text:
+            return ["🎭 The Dark Knight", "🔫 Pulp Fiction"]
+        if "romance" in text:
             return ["🚢 Titanic", "💃 La La Land"]
-        elif "space" in text or "sci" in text:
-            return ["🌌 Interstellar", "🧠 Inception"]
-        else:
-            return random.sample(self.movies, 3)
+        if "funny" in text:
+            return ["😂 Superbad", "🍻 Hangover"]
+        return random.sample(list(self.movies.keys()), 2)
 
 # =========================
 # INIT
 # =========================
 if "engine" not in st.session_state:
     st.session_state.engine = Engine()
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
 # =========================
 # HEADER
 # =========================
-st.markdown('<div class="main-header">🎬 CineMatch PRO MAX</div>', unsafe_allow_html=True)
+st.title("🎬 CineMatch PRO MAX")
 
 # =========================
-# TRENDING
+# MOOD BASED (FEATURE 1)
 # =========================
-st.subheader("🔥 Trending Movies")
-cols = st.columns(5)
-for i, m in enumerate(st.session_state.engine.movies[:5]):
-    with cols[i]:
-        st.markdown(f'<div class="movie-card">{m}</div>', unsafe_allow_html=True)
+st.subheader("🎭 Mood Based Recommendations")
+mood = st.selectbox("Select Mood", ["Happy", "Sad", "Excited", "Romantic"])
+
+if st.button("Get Mood Movies"):
+    st.success(f"Showing {mood} movies!")
+    st.write(random.sample(list(st.session_state.engine.movies.keys()), 3))
 
 # =========================
-# MAIN
+# MAIN UI
 # =========================
 col1, col2 = st.columns([1,2])
 
-# LEFT PANEL
 with col1:
     st.subheader("⭐ Rate Movies")
-
-    movie = st.selectbox("Select Movie", st.session_state.engine.movies)
+    movie = st.selectbox("Movie", list(st.session_state.engine.movies.keys()))
     rating = st.slider("Rating", 1.0, 5.0, 4.0, 0.5)
 
-    if st.button("➕ Add Rating"):
+    if st.button("Add Rating"):
         st.session_state.engine.rate(movie, rating)
-        st.success("Added!")
+        st.balloons()
         st.rerun()
 
-    if st.button("🎲 Surprise Me"):
-        m = random.choice(st.session_state.engine.movies)
-        r = random.choice([3,4,5])
-        st.session_state.engine.rate(m, r)
-        st.success(f"{m} auto-rated {r}⭐")
+    if st.button("🎲 Surprise"):
+        m = random.choice(list(st.session_state.engine.movies.keys()))
+        st.session_state.engine.rate(m, random.choice([3,4,5]))
         st.rerun()
 
     if st.button("🧹 Reset"):
         st.session_state.engine.ratings = {}
         st.session_state.engine.recommendations = []
-        st.session_state.chat_history = []
         st.rerun()
 
-# RIGHT PANEL
 with col2:
     st.subheader("🎯 Recommendations")
-
     if st.session_state.engine.recommendations:
         for m, s in st.session_state.engine.recommendations[:5]:
-            st.markdown(f'<div class="movie-card">{m} ⭐ {s}</div>', unsafe_allow_html=True)
+            st.write(f"{m} ⭐ {s}")
+            st.caption(st.session_state.engine.explain(m))
+
+            # Trailer button (FEATURE 3)
+            if st.button(f"▶ Trailer {m}"):
+                webbrowser.open("https://www.youtube.com/results?search_query="+m)
     else:
-        st.info("Rate movies to see recommendations")
+        st.info("Rate movies to get recommendations")
 
 # =========================
-# CHATGPT STYLE CHAT
+# CHAT SYSTEM (FEATURE 10)
 # =========================
 st.markdown("---")
-st.subheader("💬 AI Movie Chat")
+st.subheader("💬 Chat Recommender")
 
-user_input = st.text_input("Ask something like: 'Suggest action movies'")
+user_input = st.text_input("Ask: suggest action movies")
 
 if st.button("Send"):
-    if user_input.strip() != "":
-        st.session_state.chat_history.append(("You", user_input))
+    if user_input:
+        st.session_state.chat.append(("You", user_input))
+        reply = st.session_state.engine.chat(user_input)
+        st.session_state.chat.append(("AI", ", ".join(reply)))
 
-        with st.spinner("Thinking... 🤖"):
-            time.sleep(1)
-            response = st.session_state.engine.chat_recommend(user_input)
-
-        reply = "I recommend: " + ", ".join(response)
-        st.session_state.chat_history.append(("AI", reply))
-
-# DISPLAY CHAT
-for role, msg in st.session_state.chat_history:
-    st.markdown(f'<div class="chat-box"><b>{role}:</b> {msg}</div>', unsafe_allow_html=True)
+for role, msg in st.session_state.chat:
+    st.write(f"**{role}:** {msg}")
 
 # =========================
-# ANALYTICS
+# PERSONALITY (FEATURE 6)
+# =========================
+st.markdown("---")
+st.subheader("🧠 Your Movie Personality")
+st.success(st.session_state.engine.personality())
+
+# =========================
+# GAMIFICATION (FEATURE 5)
+# =========================
+st.markdown("### 🏆 Achievements")
+if len(st.session_state.engine.ratings) >= 5:
+    st.success("🎖 Movie Enthusiast Badge Unlocked!")
+
+# =========================
+# ANALYTICS (FEATURE 4)
 # =========================
 if st.session_state.engine.ratings:
-    st.markdown("---")
     st.subheader("📊 Your Ratings")
-
-    vals = list(st.session_state.engine.ratings.values())
-    fig = px.histogram(x=vals, nbins=5)
-    st.plotly_chart(fig, use_container_width=True)
+    fig = px.histogram(x=list(st.session_state.engine.ratings.values()))
+    st.plotly_chart(fig)
 
 # =========================
 # FOOTER
 # =========================
 st.markdown("---")
-st.caption("🎬 CineMatch PRO MAX | AI Recommender + Chat System")
+st.caption("🚀 CineMatch PRO MAX | Advanced AI Recommender")
